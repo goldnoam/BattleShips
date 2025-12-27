@@ -35,7 +35,7 @@ const SetupBoard: React.FC<SetupBoardProps> = ({ board, ships, setBoard, setShip
     return indices;
   };
 
-  const handleMouseEnter = (index: number) => {
+  const updateHoverState = (index: number) => {
     setCursorPos(index);
     const cell = board[index];
     if (cell.hasShip && cell.shipId) {
@@ -50,6 +50,10 @@ const SetupBoard: React.FC<SetupBoardProps> = ({ board, ships, setBoard, setShip
     }
     const indices = getPlacementIndices(index, selectedShip.size, orientation, board);
     setHoverIndices(indices || []);
+  };
+
+  const handleMouseEnter = (index: number) => {
+    updateHoverState(index);
   };
 
   const handlePlaceShip = (index: number) => {
@@ -69,10 +73,8 @@ const SetupBoard: React.FC<SetupBoardProps> = ({ board, ships, setBoard, setShip
   const autoPlaceRemaining = () => {
     const newBoard = [...board];
     const newShips = ships.map(s => ({ ...s }));
-    
     newShips.forEach(ship => {
       if (ship.placed) return;
-      
       let placed = false;
       let attempts = 0;
       while (!placed && attempts < 200) {
@@ -80,20 +82,12 @@ const SetupBoard: React.FC<SetupBoardProps> = ({ board, ships, setBoard, setShip
         const orient: Orientation = Math.random() > 0.5 ? 'H' : 'V';
         const index = Math.floor(Math.random() * (GRID_SIZE * GRID_SIZE));
         const indices = getPlacementIndices(index, ship.size, orient, newBoard);
-        
         if (indices && indices.every(i => !newBoard[i].hasShip)) {
-          indices.forEach(i => {
-            newBoard[i].hasShip = true;
-            newBoard[i].shipId = ship.id;
-          });
-          ship.placed = true;
-          ship.orientation = orient;
-          ship.positions = indices;
-          placed = true;
+          indices.forEach(i => { newBoard[i].hasShip = true; newBoard[i].shipId = ship.id; });
+          ship.placed = true; ship.orientation = orient; ship.positions = indices; placed = true;
         }
       }
     });
-    
     setBoard(newBoard);
     setShips(newShips);
     setSelectedShipId(null);
@@ -111,7 +105,20 @@ const SetupBoard: React.FC<SetupBoardProps> = ({ board, ships, setBoard, setShip
     setSelectedShipId(id);
   };
 
-  // Keyboard navigation
+  useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      const key = e.key.toLowerCase();
+      if (key === 'w' || key === 'arrowup') moveCursor('u');
+      if (key === 's' || key === 'arrowdown') moveCursor('d');
+      if (key === 'a' || key === 'arrowleft') moveCursor('l');
+      if (key === 'd' || key === 'arrowright') moveCursor('r');
+      if (key === 'r') setOrientation(prev => prev === 'H' ? 'V' : 'H');
+      if (key === ' ' || key === 'enter') handlePlaceShip(cursorPos);
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [cursorPos, orientation, selectedShipId, ships, board]);
+
   const moveCursor = (dir: 'u'|'d'|'l'|'r') => {
     setCursorPos(prev => {
       let next = prev;
@@ -119,12 +126,10 @@ const SetupBoard: React.FC<SetupBoardProps> = ({ board, ships, setBoard, setShip
       if (dir === 'd') next = Math.min(GRID_SIZE * GRID_SIZE - 1, prev + GRID_SIZE);
       if (dir === 'l') next = prev % GRID_SIZE === 0 ? prev : prev - 1;
       if (dir === 'r') next = prev % GRID_SIZE === GRID_SIZE - 1 ? prev : prev + 1;
-      handleMouseEnter(next);
+      updateHoverState(next);
       return next;
     });
   };
-
-  const hasUnplacedShips = ships.some(s => !s.placed);
 
   return (
     <div className="flex flex-col items-center w-full px-2">
@@ -133,11 +138,7 @@ const SetupBoard: React.FC<SetupBoardProps> = ({ board, ships, setBoard, setShip
         <div className="flex flex-col gap-2 min-w-[200px]">
           <div className="flex flex-col gap-2 overflow-y-auto max-h-[400px] pr-1 custom-scrollbar">
             {ships.map(ship => (
-              <button 
-                key={ship.id} 
-                onClick={() => setSelectedShipId(ship.id)} 
-                className={`p-3 rounded-lg text-right flex justify-between items-center transition-all ${selectedShipId === ship.id ? 'bg-cyan-600/20 border-cyan-500 border shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'bg-slate-800/50 border border-slate-700 hover:bg-slate-700/50'} ${ship.placed ? 'opacity-50 grayscale cursor-default' : ''}`}
-              >
+              <button key={ship.id} onClick={() => setSelectedShipId(ship.id)} className={`p-3 rounded-lg text-right flex justify-between items-center transition-all ${selectedShipId === ship.id ? 'bg-cyan-600/20 border-cyan-500 border shadow-[0_0_15px_rgba(6,182,212,0.3)]' : 'bg-slate-800/50 border border-slate-700 hover:bg-slate-700/50'} ${ship.placed ? 'opacity-50 grayscale cursor-default' : ''}`}>
                 <div className="flex gap-1">{Array.from({ length: ship.size }).map((_, i) => <div key={i} className="w-2 h-2 rounded-full bg-cyan-400"></div>)}</div>
                 <div className="flex flex-col items-end">
                   <span className="font-bold text-sm">{ship.name}</span>
@@ -146,29 +147,15 @@ const SetupBoard: React.FC<SetupBoardProps> = ({ board, ships, setBoard, setShip
               </button>
             ))}
           </div>
-          
           <div className="flex flex-col gap-2 mt-4">
-            <button 
-              onClick={() => setOrientation(prev => prev === 'H' ? 'V' : 'H')} 
-              className="p-3 bg-slate-100 text-slate-900 rounded-lg font-black hover:bg-white transition-all flex items-center justify-center gap-2"
-            >
-              <span>סובב: {orientation === 'H' ? 'אופקי' : 'אנכי'}</span>
-              <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="M21 12a9 9 0 0 0-9-9 9.75 9.75 0 0 0-6.74 2.74L3 8"></path><path d="M3 3v5h5"></path><path d="M3 12a9 9 0 0 0 9 9 9.75 9.75 0 0 0 6.74-2.74L21 16"></path><path d="M16 16h5v5"></path></svg>
+            <button onClick={() => setOrientation(prev => prev === 'H' ? 'V' : 'H')} className="p-3 bg-slate-100 text-slate-900 rounded-lg font-black hover:bg-white transition-all flex items-center justify-center gap-2">
+              <span>סובב (R): {orientation === 'H' ? 'אופקי' : 'אנכי'}</span>
             </button>
-            
-            {hasUnplacedShips && (
-              <button 
-                onClick={autoPlaceRemaining} 
-                className="p-3 bg-cyan-600/20 border border-cyan-500/50 text-cyan-400 rounded-lg font-bold hover:bg-cyan-600/30 transition-all flex items-center justify-center gap-2"
-              >
-                <span>מיקום אקראי</span>
-                <svg xmlns="http://www.w3.org/2000/svg" width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round"><path d="m2 12 3-3 3 3-3 3Z"></path><path d="m22 12-3-3-3 3 3 3Z"></path><path d="m12 2-3 3 3 3 3-3Z"></path><path d="m12 22-3-3 3-3 3 3Z"></path><path d="M12 8v8"></path><path d="M8 12h8"></path></svg>
-              </button>
+            {ships.some(s => !s.placed) && (
+              <button onClick={autoPlaceRemaining} className="p-3 bg-cyan-600/20 border border-cyan-500/50 text-cyan-400 rounded-lg font-bold hover:bg-cyan-600/30 transition-all">מיקום אקראי</button>
             )}
           </div>
-          
           <div className="mt-4 p-4 bg-slate-800/50 rounded-xl lg:hidden flex flex-col items-center gap-2">
-            <span className="text-xs text-slate-500 font-bold uppercase mb-2">שליטה בחיצים (מובייל)</span>
             <div className="grid grid-cols-3 gap-2">
               <div></div><button onClick={() => moveCursor('u')} className="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center">▲</button><div></div>
               <button onClick={() => moveCursor('l')} className="w-10 h-10 bg-slate-700 rounded-lg flex items-center justify-center">◀</button>
@@ -178,30 +165,20 @@ const SetupBoard: React.FC<SetupBoardProps> = ({ board, ships, setBoard, setShip
             </div>
           </div>
         </div>
-
         <div className="flex flex-col gap-2">
           <div className="grid grid-cols-10 gap-1 bg-slate-900/80 p-2 rounded-xl border border-slate-700/50 shadow-2xl relative" onMouseLeave={() => { setHoverIndices([]); setHoveredExistingShip(null); }}>
             {board.map((cell, idx) => {
               const isHover = hoverIndices.includes(idx);
               const isCursor = cursorPos === idx;
               return (
-                <div 
-                  key={idx} 
-                  onMouseEnter={() => handleMouseEnter(idx)} 
-                  onClick={() => handlePlaceShip(idx)} 
-                  className={`w-8 h-8 md:w-10 md:h-10 rounded-sm border transition-all cursor-pointer flex items-center justify-center ${cell.hasShip ? 'bg-slate-600 border-slate-500' : isHover ? 'bg-cyan-500/40 border-cyan-400 scale-105 z-10' : isCursor ? 'bg-slate-700 border-slate-600' : 'bg-slate-800 border-slate-700/30'}`}
-                >
+                <div key={idx} onMouseEnter={() => handleMouseEnter(idx)} onClick={() => handlePlaceShip(idx)} className={`w-8 h-8 md:w-10 md:h-10 rounded-sm border transition-all cursor-pointer flex items-center justify-center ${cell.hasShip ? 'bg-slate-600 border-slate-500' : isHover ? 'bg-cyan-500/40 border-cyan-400 scale-105 z-10' : isCursor ? 'bg-slate-700 border-slate-600' : 'bg-slate-800 border-slate-700/30'}`}>
                   {cell.hasShip && <div className="w-2 h-2 rounded-full bg-slate-400"></div>}
                 </div>
               );
             })}
           </div>
           <div className="h-10 flex items-center justify-center">
-            {hoveredExistingShip ? (
-              <div className="text-sm font-bold text-cyan-400 animate-in">{hoveredExistingShip.name} (גודל: {hoveredExistingShip.size})</div>
-            ) : selectedShip && hoverIndices.length > 0 ? (
-              <div className="text-sm font-bold text-slate-400 animate-in">מציב {selectedShip.name} (גודל: {selectedShip.size})</div>
-            ) : null}
+            {hoveredExistingShip ? <div className="text-sm font-bold text-cyan-400 animate-in">{hoveredExistingShip.name}</div> : selectedShip && hoverIndices.length > 0 ? <div className="text-sm font-bold text-slate-400 animate-in">מציב {selectedShip.name}</div> : null}
           </div>
         </div>
       </div>
