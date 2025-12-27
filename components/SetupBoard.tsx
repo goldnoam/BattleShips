@@ -152,7 +152,12 @@ const SetupBoard: React.FC<SetupBoardProps> = ({ board, ships, setBoard, setShip
               <span>סובב (R): {orientation === 'H' ? 'אופקי' : 'אנכי'}</span>
             </button>
             {ships.some(s => !s.placed) && (
-              <button onClick={autoPlaceRemaining} className="p-3 bg-cyan-600/20 border border-cyan-500/50 text-cyan-400 rounded-lg font-bold hover:bg-cyan-600/30 transition-all">מיקום אקראי</button>
+              <button 
+                onClick={autoPlaceRemaining} 
+                className="p-3 bg-gradient-to-r from-cyan-600 to-blue-600 text-white rounded-lg font-bold hover:from-cyan-500 hover:to-blue-500 transition-all shadow-lg active:scale-95"
+              >
+                מיקום אקראי אוטומטי
+              </button>
             )}
           </div>
           <div className="mt-4 p-4 bg-slate-800/50 rounded-xl lg:hidden flex flex-col items-center gap-2">
